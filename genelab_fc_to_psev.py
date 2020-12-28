@@ -41,7 +41,6 @@ def get_spoke_genes(spoke_directory):
 	node_list = np.load(spoke_directory+'spoke_node_list.npy', allow_pickle=False).astype(str).astype(str)
 	# load node name list
 	node_name_list = np.load(spoke_directory+'node_name_list.npy', allow_pickle=False)
-	#node_name_list = np.array([name.decode('UTF-8') for name in node_name_list], dtype=str)
 	# load spoke node list
 	node_type_list = np.load(spoke_directory+'node_type_list.npy', allow_pickle=False).astype(str)
 	# node info
@@ -125,7 +124,6 @@ def get_mapped_counts_and_diff_exp_dfs(version, accession, mouse_to_human, spoke
 	# get filenames
 	diff_files = np.array([f for f in listdir(input_directory+version+'%s/' % accession) if 'differential_expression' in f])
 	diff_files = diff_files[np.array([len(f) for f in diff_files])==min([len(f) for f in diff_files])][0]
-	print(diff_files)
 	# load exp df
 	exp_df = pd.read_csv(input_directory+version+'%s/%s' % (accession, diff_files), sep='\t', header=0, index_col=False)
 	exp_df.loc[:,'ENTREZID'] = exp_df.ENTREZID.values.astype(int)
@@ -163,7 +161,6 @@ def check_sign(exp_df, groups, space_ground_basal, group_type_1, group_type_2):
 def filter_same_direction(exp_df, gene_indices_df, samples):
 	groups = np.array(list(set(np.ravel([s[8:-1].split(')v(') for s in samples]))))
 	space_ground_basal = np.array([re.findall(r'SPACE|GROUND|BASAL', group, re.IGNORECASE)[0] for group in groups])
-	print space_ground_basal
 	control_groups = np.setdiff1d(space_ground_basal, ['Space'])
 	for control_group in control_groups:
 		exp_df = check_sign(exp_df, groups, space_ground_basal, 'Space', control_group)
