@@ -1,52 +1,58 @@
+"""This program creates the Propagated SPOKE Entry Vectors using GeneLab fold change data
+Usage:
+  make_omop_psevs.py [-b=N] [-w=N] [-i=NAME] [-d=NAME] [-v=NAME] [-s=NAME] [-o=NAME]
+  make_omop_psevs.py -h | --help
+
+Options:
+  -h --help     Show this screen.
+  -b=N     Prob of random jump [default: 0.1].
+  -w=N     Number of workers [default: 12].
+  -i=NAME     Input filename [default: GLDS-4_array_differential_expression.tsv].
+  -d=NAME     Input directory [default: GeneLab_for_SPOKE/].
+  -v=NAME     Version directory [default: V2/].
+  -s=NAME     SPOKE directory [default: spoke_v_2/].
+  -o=NAME     Output filename [default: GLDS-4_ranks_and_rank_by_type_for_meta].
+"""
+from docopt import docopt
+
+arguments = docopt(__doc__)
+
 import numpy as np
 from collections import Counter
 import os
 import pandas as pd
 import io
-import requests
 import math
 import time
 import multiprocessing as mp
 import itertools 
-from itertools import product
-from scipy.stats import zscore
 import requests
-import io
-from os import listdir
 import re
 from scipy import stats
 
 
 # Gene lab import directory
-input_directory='GeneLab_for_SPOKE/'
-# pre computed psev directory
-gene_psev_directory='spoke_v_2/gene_psevs/'
+input_directory=arguments['-d']
 # spoke directory 
-spoke_directory = 'spoke_v_2/'
+spoke_directory = arguments['-s']
+# pre computed psev directory
+gene_psev_directory=spoke_directory+'gene_psevs/'
 # save directory
-version='V2/'
+version=arguments['-v']
+# fc file
+diff_file = arguments['-i']
+# output filename
+output_filename = arguments['-o']
 # probability of random jump
-probability_random_jump = 0.1
+probability_random_jump=float(arguments['-b'])
 # number of jobs
-n_jobs=12
+n_jobs=int(arguments['-w'])
 
 save_str = '_'.join(str(probability_random_jump).split('.'))
 
 gene_indices_df, exp_df = pd.DataFrame(), pd.DataFrame()
 
 samples, avg_rank, std_rank = [],[],[]
-
-def get_spoke_genes(spoke_directory):
-	# load node list
-	node_list = np.load(spoke_directory+'spoke_node_list.npy', allow_pickle=False).astype(str).astype(str)
-	# load node name list
-	node_name_list = np.load(spoke_directory+'node_name_list.npy', allow_pickle=False)
-	# load spoke node list
-	node_type_list = np.load(spoke_directory+'node_type_list.npy', allow_pickle=False).astype(str)
-	# node info
-	node_info_df = pd.DataFrame(np.array([node_list, node_name_list, node_type_list]).T, columns=['Node', 'Node_Name', 'Node_Type'])
-	node_info_df.loc[:,'Node_Index'] = np.arange(len(node_info_df))
-	return node_info_df, node_list, node_name_list, node_type_list
 
 def load_gene_indices_df(node_list):
 	gene_indices_df = pd.read_csv(gene_psev_directory+'gene_group_%s.tsv' % 0, sep='\t', header=0, index_col=False)
@@ -120,9 +126,13 @@ def filter_and_merge_results(exp_df):
 	exp_df = exp_df[exp_df.max_fc!=0]
 	return exp_df
 
+<<<<<<< HEAD
+def get_mapped_counts_and_diff_exp_dfs(version, mouse_to_human, spoke_genes, node_list):
+=======
 def get_mapped_counts_and_diff_exp_dfs(version, accession, mouse_to_human, spoke_genes, node_list):
 	# get filename
 	diff_file = [f for f in listdir(input_directory+version) if ('differential_expression' in f) & (accession in f)][0]
+>>>>>>> dd91528dc5b35449df1bf14023a1e43df359f62a
 	# load exp df
 	exp_df = pd.read_csv(input_directory+version+diff_file, sep='\t', header=0, index_col=False)
 	exp_df.loc[:,'ENTREZID'] = exp_df.ENTREZID.values.astype(int)
@@ -176,33 +186,33 @@ def filter_same_direction(exp_df, gene_indices_df, samples):
 
 
 # load spoke info
-node_info_df, node_list, node_name_list, node_type_list = get_spoke_genes(spoke_directory)
+node_info_df = pd.read_csv(spoke_directory+'node_info.tsv', sep='\t', header=0, index_col=False)
+
 # load mouse to human
 mouse_to_human = get_mouse_to_human_entrez()
+# get fc
+exp_df, gene_indices_df, total_genes = get_mapped_counts_and_diff_exp_dfs(version, mouse_to_human, node_info_df[node_info_df.Node_Type=='Gene'].Node.values, node_info_df.Node.values)
 
-all_results_df = pd.DataFrame(np.array([node_list, node_name_list]).T, columns=['Node', 'Node_Name'])
-for a in [4, 288, 289, 244, 245, 246]:
-	# get fc
-	exp_df, gene_indices_df, total_genes = get_mapped_counts_and_diff_exp_dfs(version, 'GLDS-%s' % a, mouse_to_human, node_list[node_type_list=='Gene'], node_list)
-	samples = np.array([col for col in exp_df.columns.values if 'Log2fc_' in col])
-	# filter fc fc
-	exp_df, gene_indices_df, total_genes = filter_same_direction(exp_df, gene_indices_df, samples)
-	# z score
-	avg_rank=np.sum(np.array(get_any_func_in_par(get_mean_in_par, gene_indices_df.Round.unique(), n_jobs)), axis=0, dtype=float)/float(total_genes)
-	# get std rank of entire pop
-	std_rank = np.sqrt(np.sum(np.array(get_any_func_in_par(get_std_in_par, gene_indices_df.Round.unique(), n_jobs)), axis=0, dtype=float)/float(total_genes))
-	# get results per sample
-	sample_psev = np.array(get_any_func_in_par(get_mean_zscore_rank_exp, gene_indices_df[gene_indices_df.seen==True].Round.unique(), n_jobs))
-	sample_psev=np.sum(sample_psev, axis=0)/float(total_genes)
-	# rank nodes
-	sample_psev = get_rank_matrix(sample_psev, [], False)
-	result_df = pd.concat((node_info_df, pd.DataFrame(sample_psev.T, columns=samples)),axis=1)
-	for sample in samples:
-		result_df.loc[:,'Rank_by_type_%s' % sample] = get_rank_by_type_vector(result_df[sample].values, node_type_list)
-		#result_df.loc[:,'Rank_%s' % sample] = len(node_list)-get_order_rank_vector(result_df[sample].values, np.arange(len(node_list)))
-	#
-	all_results_df = pd.merge(all_results_df, result_df, on=['Node', 'Node_Name'])
+samples = np.array([col for col in exp_df.columns.values if 'Log2fc_' in col])
+# filter fc fc
+exp_df, gene_indices_df, total_genes = filter_same_direction(exp_df, gene_indices_df, samples)
+# z score
+avg_rank=np.sum(np.array(get_any_func_in_par(get_mean_in_par, gene_indices_df.Round.unique(), n_jobs)), axis=0, dtype=float)/float(total_genes)
+# get std rank of entire pop
+std_rank = np.sqrt(np.sum(np.array(get_any_func_in_par(get_std_in_par, gene_indices_df.Round.unique(), n_jobs)), axis=0, dtype=float)/float(total_genes))
+# get results per sample
+sample_psev = np.array(get_any_func_in_par(get_mean_zscore_rank_exp, gene_indices_df[gene_indices_df.seen==True].Round.unique(), n_jobs))
+sample_psev=np.sum(sample_psev, axis=0)/float(total_genes)
+# rank nodes
+sample_psev = get_rank_matrix(sample_psev, [], False)
+result_df = pd.concat((node_info_df, pd.DataFrame(sample_psev.T, columns=samples)),axis=1)
+for sample in samples:
+	result_df.loc[:,'Rank_by_type_%s' % sample] = get_rank_by_type_vector(result_df[sample].values, node_info_df.Node_Type.values)
 
-all_results_df.to_csv(input_directory+version+'ranks_and_rank_by_type_for_meta%s.tsv' % save_str, sep='\t', header=True, index=False)
+#
+result_df.to_csv(input_directory+version+output_filename+'%s.tsv' % save_str, sep='\t', header=True, index=False)
+
+
+
 
 
