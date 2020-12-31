@@ -1,7 +1,7 @@
 """This program creates the Propagated SPOKE Entry Vectors using GeneLab fold change data
 Usage:
-  make_omop_psevs.py [-b=N] [-w=N] [-i=NAME] [-d=NAME] [-v=NAME] [-s=NAME] [-o=NAME]
-  make_omop_psevs.py -h | --help
+  genelab_fc_to_psev.py [-b=N] [-w=N] [-i=NAME] [-d=NAME] [-v=NAME] [-s=NAME] [-o=NAME]
+  genelab_fc_to_psev.py -h | --help
 
 Options:
   -h --help     Show this screen.
