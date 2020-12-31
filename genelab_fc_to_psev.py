@@ -121,11 +121,10 @@ def filter_and_merge_results(exp_df):
 	return exp_df
 
 def get_mapped_counts_and_diff_exp_dfs(version, accession, mouse_to_human, spoke_genes, node_list):
-	# get filenames
-	diff_files = np.array([f for f in listdir(input_directory+version+'%s/' % accession) if 'differential_expression' in f])
-	diff_files = diff_files[np.array([len(f) for f in diff_files])==min([len(f) for f in diff_files])][0]
+	# get filename
+	diff_file = [f for f in listdir(input_directory+version) if ('differential_expression' in f) & (accession in f)][0]
 	# load exp df
-	exp_df = pd.read_csv(input_directory+version+'%s/%s' % (accession, diff_files), sep='\t', header=0, index_col=False)
+	exp_df = pd.read_csv(input_directory+version+diff_file, sep='\t', header=0, index_col=False)
 	exp_df.loc[:,'ENTREZID'] = exp_df.ENTREZID.values.astype(int)
 	# make map from ensembl to human entrez
 	map_from_ensembl = pd.merge(exp_df[['ENSEMBL', 'ENTREZID']], mouse_to_human[['Mouse_EntrezGene ID', 'Human_EntrezGene ID']].rename(index=str, columns={'Mouse_EntrezGene ID':'ENTREZID'}), on='ENTREZID')
